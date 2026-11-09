@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Về Đích Cùng Bác Hồ - Game Hành Quân Lịch Sử</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700;900&display=swap');
+        
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow: hidden;
+        }
+
+        /* Glassmorphism effects */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        /* Custom Scrollbar for Trivia Modal */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #eab308;
+            border-radius: 4px;
+        }
+
+        /* Responsive Canvas Container */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 1200px;
+            max-height: 700px;
+            margin: auto;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #1e293b;
+        }
+
+        /* Touch Control Buttons */
+        .touch-btn {
+            background: rgba(30, 41, 59, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(4px);
+            transition: all 0.1s ease;
+        }
+        .touch-btn:active {
+            transform: scale(0.92);
+            background: rgba(234, 179, 8, 0.4);
+            border-color: #eab308;
+        }
+
+        /* Animations */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(234, 179, 8, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(234, 179, 8, 0.8); }
+        }
+        .gold-glow {
+            animation: pulse-glow 2s infinite;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-slate-950">
+
+    <!-- Game Container -->
+    <div id="game-container" class="relative overflow-hidden sm:rounded-2xl border border-slate-800">
+        
+        <!-- Main Canvas -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Top HUD (Heads-Up Display) -->
+        <div id="hud" class="absolute top-3 left-3 right-3 flex justify-between items-center pointer-events-none z-10">
+            <!-- Left HUD: Distance Progress & Ammo -->
+            <div class="flex gap-2 sm:gap-4 items-center">
+                <!-- Ammo Badge (Max 5 bullets display) -->
+                <div class="glass-panel px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl flex items-center gap-2 text-yellow-400 font-bold shadow-lg border border-yellow-500/30">
+                    <i class="fa-solid fa-person-rifle text-lg"></i>
+                    <span id="hud-ammo" class="text-base sm:text-xl font-mono">5 / 5</span>
+                </div>
+                <!-- Coins/Points Badge -->
+                <div class="glass-panel px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl flex items-center gap-2 text-amber-300 font-bold shadow-lg">
+                    <i class="fa-solid fa-coins text-lg"></i>
+                    <span id="hud-score" class="text-base sm:text-xl font-mono">0</span>
+                </div>
+            </div>
+
+            <!-- Right HUD: Distance to Target Bar -->
+            <div class="glass-panel px-3 py-1.5 sm:px-5 sm:py-2 rounded-xl flex flex-col items-end shadow-lg w-36 sm:w-64">
+                <div class="flex justify-between w-full text-xs sm:text-sm font-semibold text-slate-200 mb-1">
+                    <span><i class="fa-solid fa-person-walking-luggage mr-1"></i>Hành quân</span>
+                    <span id="hud-distance-text" class="text-yellow-400">0%</span>
+                </div>
+                <div class="w-full bg-slate-700/60 h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-600">
+                    <div id="hud-progress-bar" class="bg-gradient-to-r from-yellow-500 to-amber-300 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Touch Controls (Visible on smaller screens or touch devices) -->
+        <div id="touch-controls" class="absolute bottom-4 left-4 right-4 flex justify-between items-end z-10 pointer-events-none sm:hidden">
+            <!-- Left Controls: Duck & Jump -->
+            <div class="flex gap-3 pointer-events-auto">
+                <button id="btn-duck" class="touch-btn w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-white active:text-yellow-400">
+                    <i class="fa-solid fa-arrow-down text-xl"></i>
+                    <span class="text-[10px] font-bold">CÚI</span>
+                </button>
+                <button id="btn-jump" class="touch-btn w-16 h-16 rounded-2xl flex flex-col items-center justify-center text-white active:text-yellow-400 bg-slate-800/80">
+                    <i class="fa-solid fa-arrow-up text-2xl"></i>
+                    <span class="text-[10px] font-bold">NHẢY</span>
+                </button>
+            </div>
+
+            <!-- Right Controls: Shoot -->
+            <div class="flex gap-3 pointer-events-auto">
+                <button id="btn-shoot" class="touch-btn w-16 h-16 rounded-2xl flex flex-col items-center justify-center text-red-400 border-red-500/40 bg-red-950/40 active:bg-red-600 active:text-white">
+                    <i class="fa-solid fa-crosshairs text-2xl"></i>
+                    <span class="text-[10px] font-bold">BẮN</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- START SCREEN OVERLAY -->
+        <div id="start-screen" class="absolute inset-0 glass-panel flex flex-col items-center justify-center p-6 text-center z-20">
+            <div class="w-20 h-20 mb-3 rounded-full bg-gradient-to-tr from-yellow-500 to-red-600 flex items-center justify-center shadow-xl gold-glow">
+                <i class="fa-solid fa-star text-4xl text-yellow-200"></i>
+            </div>
+            <h1 class="text-3xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 tracking-wide uppercase mb-2">
+                Về Đích Cùng Bác Hồ
+            </h1>
+            <p class="text-slate-300 max-w-md text-sm sm:text-base mb-6 leading-relaxed">
+                Hóa thân thành chiến sĩ bộ đội hành quân vượt qua bom đạn, giải ô chữ Lịch sử Việt Nam và tiến tới Lăng Bác!
+            </p>
+
+            <div class="glass-panel p-4 rounded-xl max-w-xs w-full text-left text-xs sm:text-sm text-slate-300 mb-6 space-y-2 border border-slate-700">
+                <div class="font-bold text-yellow-400 border-b border-slate-700 pb-1 mb-2">
+                    <i class="fa-solid fa-gamepad mr-2"></i>Hướng dẫn điều khiển:
+                </div>
+                <div class="flex justify-between items-center">
+                    <span>Nhảy / Cúi:</span>
+                    <span class="font-mono text-yellow-300 bg-slate-800 px-2 py-0.5 rounded">↑ / ↓ hoặc W / S</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span>Bắn hạ địch:</span>
+                    <span class="font-mono text-yellow-300 bg-slate-800 px-2 py-0.5 rounded">Phím Space / Nút Bắn</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span>Nhặt Quà:</span>
+                    <span class="text-slate-300">Giải đố nhận Tiền & Đạn</span>
+                </div>
+            </div>
+
+            <button id="start-btn" class="px-8 py-3.5 bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-950 font-black text-lg rounded-xl shadow-lg hover:from-yellow-400 hover:to-amber-500 transform hover:scale-105 transition duration-200 cursor-pointer gold-glow">
+                <i class="fa-solid fa-play mr-2"></i> BẮT ĐẦU HÀNH QUÂN
+            </button>
+        </div>
+
+        <!-- HISTORICAL TRIVIA QUESTION / REVIVE MODAL -->
+        <div id="trivia-modal" class="hidden absolute inset-0 glass-panel flex items-center justify-center p-4 z-30">
+            <div class="bg-slate-900/95 border-2 border-yellow-500/60 rounded-2xl p-5 sm:p-7 max-w-lg w-full shadow-2xl relative custom-scroll max-h-[90vh] overflow-y-auto">
+                <!-- Header Badge -->
+                <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                    <span class="bg-red-600/30 text-red-400 text-xs sm:text-sm font-bold px-3 py-1 rounded-full border border-red-500/40 flex items-center gap-1.5 animate-pulse">
+                        <i class="fa-solid fa-triangle-exclamation"></i> CỨU MẠNG HÀNH QUÂN
+                    </span>
+                    <span class="text-yellow-400 text-xs font-semibold"><i class="fa-solid fa-lightbulb mr-1"></i>Trả lời đúng để đi tiếp!</span>
+                </div>
+
+                <!-- Incident Reason Text -->
+                <p id="trivia-reason" class="text-xs text-amber-300/90 mb-3 font-semibold bg-amber-950/40 p-2.5 rounded-lg border border-amber-500/20">
+                    Bạn vừa dẫm phải chướng ngại vật! Trả lời câu hỏi lịch sử về Bác Hồ để cứu mạng chiến sĩ:
+                </p>
+
+                <!-- Question Text -->
+                <h3 id="trivia-question" class="text-base sm:text-xl font-bold text-slate-100 mb-4 leading-snug">
+                    Đang tải câu hỏi...
+                </h3>
+
+                <!-- Options Grid -->
+                <div id="trivia-options" class="grid grid-cols-1 gap-2.5 mb-4">
+                    <!-- Dynamic Answer Buttons -->
+                </div>
+
+                <!-- Hint Area -->
+                <div id="trivia-hint-box" class="hidden bg-slate-800/90 border border-yellow-500/40 rounded-xl p-3 mb-4 text-xs sm:text-sm text-yellow-200">
+                    <i class="fa-solid fa-circle-info text-yellow-400 mr-2 text-base"></i>
+                    <span id="trivia-hint-text">Gợi ý câu hỏi...</span>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div class="flex justify-between items-center pt-2">
+                    <button id="btn-hint" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-yellow-400 text-xs sm:text-sm font-semibold rounded-lg border border-yellow-500/30 transition flex items-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-lightbulb"></i> Xem Gợi Ý Cứu Mạng
+                    </button>
+                    <span class="text-[11px] text-slate-400">Đúng: Hồi sinh | Sai: Thua cuộc</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME OVER / VICTORY OVERLAY -->
+        <div id="end-screen" class="hidden absolute inset-0 glass-panel flex flex-col items-center justify-center p-6 text-center z-40">
+            <div id="end-icon" class="w-24 h-24 mb-4 rounded-full flex items-center justify-center text-5xl shadow-2xl">
+                <!-- Icon via JS -->
+            </div>
+            <h2 id="end-title" class="text-3xl sm:text-5xl font-black text-white mb-2">
+                HÀNH QUÂN THẤT BẠI!
+            </h2>
+            <p id="end-subtitle" class="text-slate-300 text-sm sm:text-base mb-6 max-w-md">
+                Đồng chí đã trả lời chưa chính xác hoặc gặp sự cố chướng ngại vật.
+            </p>
+
+            <!-- Final Stats Box -->
+            <div class="glass-panel p-4 rounded-2xl w-full max-w-xs mb-6 border border-slate-700 space-y-3">
+                <div class="flex justify-between items-center text-slate-300 text-sm">
+                    <span>Tổng Quãng Đường:</span>
+                    <span id="end-dist" class="font-bold text-yellow-400 font-mono">0%</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-300 text-sm">
+                    <span>Điểm Chiến Thắng:</span>
+                    <span id="end-score" class="font-bold text-amber-300 font-mono">0</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-300 text-sm">
+                    <span>Đạn Còn Lại:</span>
+                    <span id="end-ammo" class="font-bold text-red-400 font-mono">0 / 5</span>
+                </div>
+            </div>
+
+            <button id="restart-btn" class="px-8 py-3.5 bg-gradient-to-r from-yellow-500 to-amber-600 text-slate-950 font-black text-lg rounded-xl shadow-lg hover:from-yellow-400 hover:to-amber-500 transform hover:scale-105 transition duration-200 cursor-pointer">
+                <i class="fa-solid fa-rotate-right mr-2"></i> HÀNH QUÂN LẠI
+            </button>
+        </div>
+
+    </div>
+
+    <!-- AUDIO SYNTHESIZER (No external audio files needed!) -->
+    <script>
+        // Web Audio API Synthesizer for sound effects
+        const AudioFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+            },
+            playJump() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(450, this.ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            },
+            playShoot() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            },
+            playCollect() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(880, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            },
+            playExplode() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(20, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.3);
+            },
+            playVictory() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [261.63, 329.63, 392.00, 523.25];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+                    gain.gain.setValueAtTime(0.3, now + idx * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.12 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.12);
+                    osc.stop(now + idx * 0.12 + 0.3);
+                });
+            }
+        };
+    </script>
+
+    <!-- HISTORICAL TRIVIA DATABASE -->
+    <script>
+        const TRIVIA_QUESTIONS = [
+            {
+                q: "Bác Hồ sinh ngày tháng năm nào?",
+                options: ["19/05/1890", "02/09/1945", "05/06/1911", "19/08/1945"],
+                answer: 0,
+                hint: "Bác sinh tại làng Sen, xã Kim Liên, huyện Nam Đàn, tỉnh Nghệ An vào tháng 5."
+            },
+            {
+                q: "Bác Hồ ra đi tìm đường cứu nước vào năm nào tại bến cảng Nhà Rồng?",
+                options: ["1930", "1911", "1920", "1941"],
+                answer: 1,
+                hint: "Bác xuống con tàu Amiral Latouche-Tréville với tên gọi Văn Ba vào tháng 6 năm này."
+            },
+            {
+                q: "Bản Tuyên ngôn Độc lập được Bác Hồ đọc tại Quảng trường Ba Đình vào ngày nào?",
+                options: ["19/08/1945", "02/09/1945", "07/05/1954", "30/04/1975"],
+                answer: 1,
+                hint: "Đây là ngày Quốc khánh của nước Cộng hòa Xã hội Chủ nghĩa Việt Nam."
+            },
+            {
+                q: "Chiến dịch lịch sử lừng lẫy năm châu, chấn động địa cầu năm 1954 là chiến dịch nào?",
+                options: ["Chiến dịch Việt Bắc", "Chiến dịch Biên Giới", "Chiến dịch Điện Biên Phủ", "Chiến dịch Hồ Chí Minh"],
+                answer: 2,
+                hint: "Chiến dịch kết thúc thắng lợi sau 56 ngày đêm 'khoét núi, ngủ hầm, mưa dầm, cơm vắt'."
+            },
+            {
+                q: "Tên gọi đầu tiên của Bác Hồ khi sinh ra là gì?",
+                options: ["Nguyễn Tất Thành", "Nguyễn Sinh Cung", "Nguyễn Ái Quốc", "Văn Ba"],
+                answer: 1,
+                hint: "Tên thuở nhỏ do thân phụ Nguyễn Sinh Sắc đặt cho Bác."
+            },
+            {
+                q: "Đảng Cộng sản Việt Nam do Bác Hồ chủ trì thành lập vào thời gian nào?",
+                options: ["03/02/1930", "19/05/1941", "22/12/1944", "02/09/1945"],
+                answer: 0,
+                hint: "Hội nghị hợp nhất các tổ chức cộng sản diễn ra tại Cửu Long (Hương Cảng, Trung Quốc)."
+            },
+            {
+                q: "Đội Việt Nam Tuyên truyền Giải phóng quân (tiền thân của Quân đội Nhân dân Việt Nam) được thành lập vào ngày nào?",
+                options: ["22/12/1944", "19/05/1941", "15/05/1945", "30/04/1975"],
+                answer: 0,
+                hint: "Ngày này hiện nay được lấy làm Ngày thành lập Quân đội Nhân dân Việt Nam."
+            },
+            {
+                q: "Chiến dịch giải phóng miền Nam thống nhất đất nước năm 1975 được mang tên là gì?",
+                options: ["Chiến dịch Tây Nguyên", "Chiến dịch Hồ Chí Minh", "Chiến dịch Huế - Đà Nẵng", "Chiến dịch Đường 9"],
+                answer: 1,
+                hint: "Bộ Chính trị đã quyết định đổi tên chiến dịch giải phóng Sài Gòn - Gia Định thành tên của Bác."
+            }
+        ];
+    </script>
+
+    <!-- MAIN GAME ENGINE JS -->
+    <script>
+        // DOM Elements
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const hudAmmo = document.getElementById('hud-ammo');
+        const hudScore = document.getElementById('hud-score');
+        const hudDistText = document.getElementById('hud-distance-text');
+        const hudProgressBar = document.getElementById('hud-progress-bar');
+        
+        const startScreen = document.getElementById('start-screen');
+        const triviaModal = document.getElementById('trivia-modal');
+        const triviaReason = document.getElementById('trivia-reason');
+        const endScreen = document.getElementById('end-screen');
+
+        const triviaQuestion = document.getElementById('trivia-question');
+        const triviaOptions = document.getElementById('trivia-options');
+        const triviaHintBox = document.getElementById('trivia-hint-box');
+        const triviaHintText = document.getElementById('trivia-hint-text');
+        const btnHint = document.getElementById('btn-hint');
+
+        // Touch buttons
+        const btnJump = document.getElementById('btn-jump');
+        const btnDuck = document.getElementById('btn-duck');
+        const btnShoot = document.getElementById('btn-shoot');
+
+        // Canvas Responsive Setup
+        let canvasWidth = 1000;
+        let canvasHeight = 500;
+        
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            canvasWidth = canvas.width;
+            canvasHeight = canvas.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Game State Variables
+        let gameState = 'START'; // START, PLAYING, TRIVIA, END
+        let distance = 0;
+        const TARGET_DISTANCE = 1500; // Target goal distance
+        let score = 0;
+        
+        // AMMO MAX LIMIT = 5
+        const MAX_AMMO = 5;
+        let ammo = MAX_AMMO;
+        let speed = 5;
+        let gameFrame = 0;
+        let pendingCollisionReason = "";
+
+        // Player Character Object
+        const groundY = () => canvasHeight - 80;
+        const player = {
+            x: 80,
+            y: 0,
+            width: 44,
+            height: 64,
+            vy: 0,
+            gravity: 0.7,
+            jumpPower: -13.5,
+            isJumping: false,
+            isDucking: false,
+            frame: 0,
+            invulnerableTimer: 0,
+            
+            reset() {
+                this.y = groundY() - this.height;
+                this.vy = 0;
+                this.isJumping = false;
+                this.isDucking = false;
+                this.invulnerableTimer = 0;
+            },
+            
+            jump() {
+                if (!this.isJumping) {
+                    this.vy = this.jumpPower;
+                    this.isJumping = true;
+                    AudioFX.playJump();
+                }
+            },
+
+            duck(isDucking) {
+                if (this.isJumping) return;
+                if (isDucking && !this.isDucking) {
+                    this.isDucking = true;
+                    this.height = 36;
+                    this.y = groundY() - this.height;
+                } else if (!isDucking && this.isDucking) {
+                    this.isDucking = false;
+                    this.height = 64;
+                    this.y = groundY() - this.height;
+                }
+            },
+
+            update() {
+                this.y += this.vy;
+                this.vy += this.gravity;
+
+                const targetY = groundY() - this.height;
+                if (this.y >= targetY) {
+                    this.y = targetY;
+                    this.vy = 0;
+                    this.isJumping = false;
+                }
+
+                if (gameFrame % 6 === 0) {
+                    this.frame = (this.frame + 1) % 4;
+                }
+
+                if (this.invulnerableTimer > 0) {
+                    this.invulnerableTimer--;
+                }
+            },
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Blink effect if invulnerable after revive
+                if (this.invulnerableTimer > 0 && Math.floor(this.invulnerableTimer / 4) % 2 === 0) {
+                    ctx.globalAlpha = 0.5;
+                }
+
+                if (this.isDucking) {
+                    ctx.fillStyle = '#3f6212';
+                    ctx.fillRect(4, 12, 36, 20);
+                    ctx.fillStyle = '#166534';
+                    ctx.beginPath();
+                    ctx.arc(32, 10, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(18, 18, 24, 6);
+                } else {
+                    ctx.strokeStyle = '#365314';
+                    ctx.lineWidth = 6;
+                    const legOffset = Math.sin(this.frame * Math.PI / 2) * 12;
+                    ctx.beginPath();
+                    ctx.moveTo(14, 44);
+                    ctx.lineTo(14 + legOffset, 64);
+                    ctx.moveTo(30, 44);
+                    ctx.lineTo(30 - legOffset, 64);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#4d7c0f';
+                    ctx.fillRect(10, 18, 24, 28);
+
+                    ctx.fillStyle = '#78350f';
+                    ctx.fillRect(4, 22, 8, 16);
+
+                    ctx.fillStyle = '#fde047';
+                    ctx.beginPath();
+                    ctx.arc(22, 12, 8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#15803d';
+                    ctx.beginPath();
+                    ctx.ellipse(22, 9, 13, 7, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath();
+                    ctx.arc(22, 7, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#334155';
+                    ctx.fillRect(18, 26, 24, 5);
+                    ctx.fillRect(36, 28, 4, 8);
+                }
+
+                ctx.restore();
+            }
+        };
+
+        // Game Entities Arrays
+        let obstacles = [];
+        let items = [];
+        let bullets = [];
+        let particles = [];
+        let uncleHoNpc = null;
+
+        // Obstacle Generator
+        function spawnObstacle() {
+            const types = ['SPIKE', 'SOLDIER', 'PLANE_BOMB'];
+            const type = types[Math.floor(Math.random() * types.length)];
+
+            if (type === 'SPIKE') {
+                obstacles.push({
+                    type: 'SPIKE',
+                    x: canvasWidth + 50,
+                    y: groundY() - 32,
+                    width: 35,
+                    height: 32,
+                    name: "bẫy/chướng ngại vật dưới đất"
+                });
+            } else if (type === 'SOLDIER') {
+                obstacles.push({
+                    type: 'SOLDIER',
+                    x: canvasWidth + 50,
+                    y: groundY() - 55,
+                    width: 38,
+                    height: 55,
+                    hp: 1,
+                    name: "kẻ địch phía trước"
+                });
+            } else if (type === 'PLANE_BOMB') {
+                obstacles.push({
+                    type: 'PLANE_BOMB',
+                    x: canvasWidth + 50,
+                    y: 60 + Math.random() * 80,
+                    width: 50,
+                    height: 25,
+                    bombDropped: false,
+                    name: "bom máy bay"
+                });
+            }
+        }
+
+        // Ammo Pickups Generator
+        function spawnItem() {
+            items.push({
+                type: 'AMMO',
+                x: canvasWidth + 50,
+                y: groundY() - 45,
+                width: 32,
+                height: 32,
+                bounce: 0
+            });
+        }
+
+        // Particle Effects (Explosions/Stars)
+        function createExplosion(x, y, color = '#f97316') {
+            for (let i = 0; i < 12; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    radius: Math.random() * 4 + 2,
+                    color: color,
+                    life: 20
+                });
+            }
+        }
+
+        // Shoot Bullet Function (Max 5 bullets limit)
+        function shootBullet() {
+            if (ammo > 0 && gameState === 'PLAYING') {
+                ammo--;
+                hudAmmo.innerText = `${ammo} / ${MAX_AMMO}`;
+                AudioFX.playShoot();
+
+                bullets.push({
+                    x: player.x + player.width,
+                    y: player.y + (player.isDucking ? 18 : 26),
+                    vx: 12,
+                    radius: 4
+                });
+            }
+        }
+
+        // Input Handlers
+        window.addEventListener('keydown', (e) => {
+            if (gameState !== 'PLAYING') return;
+            if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+                player.jump();
+            }
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                player.duck(true);
+            }
+            if (e.code === 'Space') {
+                shootBullet();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                player.duck(false);
+            }
+        });
+
+        // Touch Control Listeners
+        btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); player.jump(); });
+        btnDuck.addEventListener('touchstart', (e) => { e.preventDefault(); player.duck(true); });
+        btnDuck.addEventListener('touchend', (e) => { e.preventDefault(); player.duck(false); });
+        btnShoot.addEventListener('touchstart', (e) => { e.preventDefault(); shootBullet(); });
+
+        btnJump.addEventListener('mousedown', () => player.jump());
+        btnDuck.addEventListener('mousedown', () => player.duck(true));
+        btnDuck.addEventListener('mouseup', () => player.duck(false));
+        btnShoot.addEventListener('mousedown', () => shootBullet());
+
+        // Update Game Loop Logic
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            gameFrame++;
+            distance += 1;
+
+            // HUD Progress Updates
+            const progressPct = Math.min(100, Math.floor((distance / TARGET_DISTANCE) * 100));
+            hudDistText.innerText = progressPct + '%';
+            hudProgressBar.style.width = progressPct + '%';
+
+            // Check Win Condition
+            if (distance >= TARGET_DISTANCE && !uncleHoNpc) {
+                uncleHoNpc = {
+                    x: canvasWidth + 100,
+                    y: groundY() - 70,
+                    width: 50,
+                    height: 70
+                };
+            }
+
+            if (uncleHoNpc) {
+                uncleHoNpc.x -= speed * 0.7;
+                if (uncleHoNpc.x <= player.x + 120) {
+                    winGame();
+                    return;
+                }
+            }
+
+            player.update();
+
+            // Spawn Obstacles & Ammo periodically
+            if (!uncleHoNpc) {
+                if (gameFrame % 110 === 0) spawnObstacle();
+                if (gameFrame % 140 === 0) spawnItem();
+            }
+
+            // Update Bullets
+            for (let b = bullets.length - 1; b >= 0; b--) {
+                bullets[b].x += bullets[b].vx;
+                if (bullets[b].x > canvasWidth) {
+                    bullets.splice(b, 1);
+                }
+            }
+
+            // Update Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= speed;
+
+                if (obs.type === 'PLANE_BOMB' && !obs.bombDropped && obs.x < player.x + 250) {
+                    obs.bombDropped = true;
+                    obstacles.push({
+                        type: 'BOMB',
+                        x: obs.x + 20,
+                        y: obs.y + 20,
+                        width: 16,
+                        height: 24,
+                        vy: 4,
+                        name: "bom rơi từ trên không"
+                    });
+                }
+
+                if (obs.type === 'BOMB') {
+                    obs.y += obs.vy;
+                    if (obs.y >= groundY() - obs.height) {
+                        obs.y = groundY() - obs.height;
+                    }
+                }
+
+                // Bullet Collision with Enemy Soldiers
+                for (let b = bullets.length - 1; b >= 0; b--) {
+                    if (obs.type === 'SOLDIER' && checkCollision(bullets[b], obs)) {
+                        createExplosion(obs.x + obs.width / 2, obs.y + obs.height / 2, '#ef4444');
+                        AudioFX.playExplode();
+                        obstacles.splice(i, 1);
+                        bullets.splice(b, 1);
+                        score += 100;
+                        hudScore.innerText = score.toLocaleString();
+                        break;
+                    }
+                }
+
+                if (!obstacles[i]) continue;
+
+                // Player Collision with Obstacles -> Trigger TRIVIA REVIVE MODAL
+                if (player.invulnerableTimer === 0 && checkCollision(player, obs)) {
+                    createExplosion(player.x, player.y, '#dc2626');
+                    AudioFX.playExplode();
+                    pendingCollisionReason = `Bạn vừa bị dính ${obs.name || 'chướng ngại vật'}!`;
+                    obstacles.splice(i, 1);
+                    triggerTriviaReviveModal();
+                    return;
+                }
+
+                if (obs.x + obs.width < -50) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // Update Collectible Ammo Items (Max ammo = 5)
+            for (let i = items.length - 1; i >= 0; i--) {
+                let item = items[i];
+                item.x -= speed;
+                item.bounce = Math.sin(gameFrame * 0.1) * 4;
+
+                if (checkCollision(player, item)) {
+                    AudioFX.playCollect();
+                    if (ammo < MAX_AMMO) {
+                        ammo = Math.min(MAX_AMMO, ammo + 2);
+                        hudAmmo.innerText = `${ammo} / ${MAX_AMMO}`;
+                    }
+                    score += 50;
+                    hudScore.innerText = score.toLocaleString();
+                    createExplosion(item.x, item.y, '#eab308');
+                    items.splice(i, 1);
+                }
+
+                if (items[i] && items[i].x < -40) {
+                    items.splice(i, 1);
+                }
+            }
+
+            // Update Particle FX
+            for (let p = particles.length - 1; p >= 0; p--) {
+                particles[p].x += particles[p].vx;
+                particles[p].y += particles[p].vy;
+                particles[p].life--;
+                if (particles[p].life <= 0) particles.splice(p, 1);
+            }
+        }
+
+        // Render Canvas Graphics
+        function draw() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            // 1. Sky
+            const skyGradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+            skyGradient.addColorStop(0, '#0284c7');
+            skyGradient.addColorStop(0.7, '#38bdf8');
+            skyGradient.addColorStop(1, '#bae6fd');
+            ctx.fillStyle = skyGradient;
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+            // 2. Sun & Mountains
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(canvasWidth - 120, 90, 45, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#166534';
+            ctx.beginPath();
+            ctx.moveTo(0, groundY());
+            for (let i = 0; i <= canvasWidth; i += 120) {
+                ctx.lineTo(i + 60, groundY() - 80 - Math.sin(i) * 30);
+            }
+            ctx.lineTo(canvasWidth, groundY());
+            ctx.fill();
+
+            // 3. Ground
+            ctx.fillStyle = '#65a30d';
+            ctx.fillRect(0, groundY(), canvasWidth, 12);
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(0, groundY() + 12, canvasWidth, canvasHeight - groundY());
+
+            ctx.strokeStyle = '#a16207';
+            ctx.lineWidth = 2;
+            const lineOffset = (gameFrame * speed) % 40;
+            for (let x = -lineOffset; x < canvasWidth; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, groundY() + 25);
+                ctx.lineTo(x + 20, groundY() + 25);
+                ctx.stroke();
+            }
+
+            // 4. Draw Uncle Ho at Destination
+            if (uncleHoNpc) {
+                ctx.save();
+                ctx.translate(uncleHoNpc.x, uncleHoNpc.y);
+                ctx.fillStyle = '#fef08a';
+                ctx.fillRect(10, 25, 30, 45);
+                ctx.fillStyle = '#fde047';
+                ctx.beginPath();
+                ctx.arc(25, 15, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(25, 10, 10, Math.PI, Math.PI * 2);
+                ctx.fill();
+                ctx.fillRect(21, 20, 8, 10);
+
+                ctx.strokeStyle = '#fef08a';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(35, 30);
+                const wave = Math.sin(gameFrame * 0.2) * 10;
+                ctx.lineTo(48, 15 + wave);
+                ctx.stroke();
+
+                ctx.fillStyle = '#da251d';
+                ctx.fillRect(-20, -20, 30, 20);
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(-5, -10, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            // 5. Draw Player
+            player.draw();
+
+            // 6. Draw Bullets
+            ctx.fillStyle = '#facc15';
+            bullets.forEach(b => {
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 7. Draw Obstacles
+            obstacles.forEach(obs => {
+                if (obs.type === 'SPIKE') {
+                    ctx.fillStyle = '#475569';
+                    ctx.beginPath();
+                    ctx.moveTo(obs.x, obs.y + obs.height);
+                    ctx.lineTo(obs.x + obs.width / 2, obs.y);
+                    ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
+                    ctx.fill();
+                } else if (obs.type === 'SOLDIER') {
+                    ctx.fillStyle = '#334155';
+                    ctx.fillRect(obs.x + 8, obs.y + 15, 22, 40);
+                    ctx.fillStyle = '#0f172a';
+                    ctx.beginPath();
+                    ctx.arc(obs.x + 19, obs.y + 10, 9, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (obs.type === 'PLANE_BOMB') {
+                    ctx.fillStyle = '#475569';
+                    ctx.fillRect(obs.x, obs.y, obs.width, 12);
+                    ctx.fillRect(obs.x + 18, obs.y - 8, 12, 28);
+                } else if (obs.type === 'BOMB') {
+                    ctx.fillStyle = '#0f172a';
+                    ctx.beginPath();
+                    ctx.arc(obs.x + 8, obs.y + 12, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fillRect(obs.x + 6, obs.y, 4, 4);
+                }
+            });
+
+            // 8. Draw Collectible Ammo Boxes
+            items.forEach(item => {
+                const drawY = item.y + item.bounce;
+                ctx.fillStyle = '#15803d';
+                ctx.fillRect(item.x, drawY, item.width, item.height);
+                ctx.fillStyle = '#facc15';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.fillText('+ĐẠN', item.x + 2, drawY + 20);
+            });
+
+            // 9. Particles
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Collision Check Helper
+        function checkCollision(rect1, rect2) {
+            const r1x = rect1.x;
+            const r1y = rect1.y;
+            const r1w = rect1.width || rect1.radius * 2;
+            const r1h = rect1.height || rect1.radius * 2;
+
+            const r2x = rect2.x;
+            const r2y = rect2.y;
+            const r2w = rect2.width;
+            const r2h = rect2.height;
+
+            return (
+                r1x < r2x + r2w &&
+                r1x + r1w > r2x &&
+                r1y < r2y + r2h &&
+                r1y + r1h > r2y
+            );
+        }
+
+        // Historical Trivia / Revive System
+        let currentQuestion = null;
+
+        function triggerTriviaReviveModal() {
+            gameState = 'TRIVIA';
+            currentQuestion = TRIVIA_QUESTIONS[Math.floor(Math.random() * TRIVIA_QUESTIONS.length)];
+
+            triviaReason.innerText = pendingCollisionReason + " Trả lời đúng câu hỏi lịch sử Bác Hồ để cứu mạng chiến sĩ:";
+            triviaQuestion.innerText = currentQuestion.q;
+            triviaOptions.innerHTML = '';
+            triviaHintBox.classList.add('hidden');
+
+            currentQuestion.options.forEach((optText, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left px-4 py-3 bg-slate-800 hover:bg-amber-500/20 hover:border-amber-500 text-slate-200 hover:text-white rounded-xl border border-slate-700 transition font-medium text-sm flex justify-between items-center active:scale-98";
+                btn.innerHTML = `<span>${optText}</span> <i class="fa-solid fa-chevron-right text-xs opacity-50"></i>`;
+                btn.onclick = () => handleTriviaAnswer(idx);
+                triviaOptions.appendChild(btn);
+            });
+
+            triviaModal.classList.remove('hidden');
+        }
+
+        btnHint.onclick = () => {
+            if (currentQuestion) {
+                triviaHintText.innerText = currentQuestion.hint;
+                triviaHintBox.classList.remove('hidden');
+            }
+        };
+
+        function handleTriviaAnswer(selectedIdx) {
+            triviaModal.classList.add('hidden');
+
+            if (selectedIdx === currentQuestion.answer) {
+                // Correct Answer -> REVIVE PLAYER & CONTINUE!
+                score += 200;
+                ammo = Math.min(MAX_AMMO, ammo + 2); // Bonus ammo on revive
+                hudScore.innerText = score.toLocaleString();
+                hudAmmo.innerText = `${ammo} / ${MAX_AMMO}`;
+                AudioFX.playCollect();
+
+                // Grant 90 frames (~1.5s) invulnerability after revive
+                player.invulnerableTimer = 90;
+                gameState = 'PLAYING';
+                requestAnimationFrame(gameLoop);
+            } else {
+                // Incorrect Answer -> GAME OVER / HÀNH QUÂN THẤT BẠI
+                AudioFX.playExplode();
+                gameOver();
+            }
+        }
+
+        // Victory Screen
+        function winGame() {
+            gameState = 'END';
+            AudioFX.playVictory();
+            
+            const endIcon = document.getElementById('end-icon');
+            endIcon.className = "w-24 h-24 mb-4 rounded-full flex items-center justify-center text-5xl shadow-2xl bg-yellow-500 text-slate-950 gold-glow";
+            endIcon.innerHTML = `<i class="fa-solid fa-trophy"></i>`;
+
+            document.getElementById('end-title').innerText = "VỀ ĐÍCH THÀNH CÔNG!";
+            document.getElementById('end-subtitle').innerText = "Chúc mừng Đồng chí đã xuất sắc vượt qua gian khó và hành quân tiến tới Lăng Bác!";
+            document.getElementById('end-dist').innerText = "100%";
+            document.getElementById('end-score').innerText = score.toLocaleString();
+            document.getElementById('end-ammo').innerText = `${ammo} / ${MAX_AMMO}`;
+
+            endScreen.classList.remove('hidden');
+        }
+
+        // Game Over Screen (Hành quân thất bại)
+        function gameOver() {
+            gameState = 'END';
+            
+            const endIcon = document.getElementById('end-icon');
+            endIcon.className = "w-24 h-24 mb-4 rounded-full flex items-center justify-center text-5xl shadow-2xl bg-red-600 text-white";
+            endIcon.innerHTML = `<i class="fa-solid fa-person-falling-burst"></i>`;
+
+            document.getElementById('end-title').innerText = "HÀNH QUÂN THẤT BẠI!";
+            document.getElementById('end-subtitle').innerText = "Rất tiếc! Câu trả lời chưa chính xác hoặc đồng chí đã gặp sự cố trên đường đi.";
+            document.getElementById('end-dist').innerText = Math.floor((distance / TARGET_DISTANCE) * 100) + "%";
+            document.getElementById('end-score').innerText = score.toLocaleString();
+            document.getElementById('end-ammo').innerText = `${ammo} / ${MAX_AMMO}`;
+
+            endScreen.classList.remove('hidden');
+        }
+
+        // Main Animation Loop
+        function gameLoop() {
+            if (gameState === 'PLAYING') {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Reset and Start Game
+        function startGame() {
+            gameState = 'PLAYING';
+            distance = 0;
+            score = 0;
+            ammo = MAX_AMMO;
+            gameFrame = 0;
+            obstacles = [];
+            items = [];
+            bullets = [];
+            particles = [];
+            uncleHoNpc = null;
+
+            hudAmmo.innerText = `${ammo} / ${MAX_AMMO}`;
+            hudScore.innerText = score;
+            hudDistText.innerText = '0%';
+            hudProgressBar.style.width = '0%';
+
+            player.reset();
+            AudioFX.init();
+
+            startScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            triviaModal.classList.add('hidden');
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        const startBtn = document.getElementById('start-btn');
+        if (startBtn) startBtn.onclick = startGame;
+
+        const restartBtn = document.getElementById('restart-btn');
+        if (restartBtn) restartBtn.onclick = startGame;
+
+        draw();
+    </script>
+</body>
+</html>
